@@ -1,0 +1,11 @@
+---
+# Configures the standalone Jenkins controller EC2 instance.
+# Usage:
+#   1. terraform apply, note the jenkins_public_ip output
+#   2. edit inventory.ini with that IP and your key path
+#   3. ansible-playbook playbook.yml
+- name: Configure Jenkins controller
+  hosts: jenkins
+  become: true
+  roles:
+    - jenkins

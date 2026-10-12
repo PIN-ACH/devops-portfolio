@@ -1,0 +1,59 @@
+# Helm values for kube-prometheus-stack, tuned for a small/cheap demo cluster.
+# Install directly (alternative to the Argo CD app):
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm repo update
+#   helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+#     -n monitoring --create-namespace -f monitoring/values.yaml
+
+prometheus:
+  prometheusSpec:
+    retention: 2d
+    # Scrape pods that carry prometheus.io/scrape annotations (our app does).
+    additionalScrapeConfigs:
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+
+grafana:
+  # In a real setup, source this from a Secret, not plaintext.
+  adminPassword: "changeme"
+  service:
+    type: LoadBalancer
+  defaultDashboardsEnabled: true
+  # Auto-load the custom app dashboard from a ConfigMap labelled below.
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+# Keep the demo lean.
+nodeExporter:
+  enabled: true
+kubeStateMetrics:
+  enabled: true

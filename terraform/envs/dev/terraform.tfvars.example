@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars and fill in your values. Do NOT commit real values.
+region                = "us-east-1"
+key_name              = "your-ec2-keypair-name"
+allowed_ssh_cidr      = "YOUR.PUBLIC.IP.HERE/32"
+
+# Cost knobs — defaults are already tuned for a $200 budget.
+node_capacity_type    = "SPOT"
+node_desired_size     = 2
+db_instance_class     = "db.t3.micro"
+jenkins_instance_type = "t3.medium"

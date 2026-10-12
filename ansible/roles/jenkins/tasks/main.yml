@@ -1,0 +1,122 @@
+---
+# Install and configure Jenkins + the tooling the pipeline needs:
+# Java, Docker, AWS CLI v2, kubectl, Helm, Argo CD CLI, Node.js.
+
+- name: Update apt cache
+  apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install base packages
+  apt:
+    name:
+      - openjdk-17-jdk
+      - git
+      - curl
+      - unzip
+      - gnupg
+      - ca-certificates
+      - apt-transport-https
+    state: present
+
+# --- Docker -----------------------------------------------------------------
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker repo
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+
+- name: Install Docker engine
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+    update_cache: true
+
+- name: Ensure Docker is running
+  service:
+    name: docker
+    state: started
+    enabled: true
+
+# --- Jenkins ----------------------------------------------------------------
+- name: Add Jenkins GPG key
+  get_url:
+    url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+    dest: /usr/share/keyrings/jenkins-keyring.asc
+
+- name: Add Jenkins apt repo
+  apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+    state: present
+    filename: jenkins
+
+- name: Install Jenkins
+  apt:
+    name: jenkins
+    state: present
+    update_cache: true
+
+- name: Add jenkins user to docker group
+  user:
+    name: jenkins
+    groups: docker
+    append: true
+
+# --- AWS CLI v2 -------------------------------------------------------------
+- name: Download AWS CLI v2
+  get_url:
+    url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+    dest: /tmp/awscliv2.zip
+
+- name: Unzip AWS CLI
+  unarchive:
+    src: /tmp/awscliv2.zip
+    dest: /tmp
+    remote_src: true
+
+- name: Install AWS CLI
+  command: /tmp/aws/install --update
+  args:
+    creates: /usr/local/bin/aws
+
+# --- kubectl ----------------------------------------------------------------
+- name: Install kubectl
+  get_url:
+    url: "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl"
+    dest: /usr/local/bin/kubectl
+    mode: "0755"
+
+# --- Helm -------------------------------------------------------------------
+- name: Install Helm
+  shell: curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  args:
+    creates: /usr/local/bin/helm
+
+# --- Node.js 20 (for running app tests on the controller if needed) ---------
+- name: Add NodeSource repo
+  shell: curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  args:
+    creates: /etc/apt/sources.list.d/nodesource.list
+
+- name: Install Node.js
+  apt:
+    name: nodejs
+    state: present
+    update_cache: true
+
+- name: Restart Jenkins to pick up docker group membership
+  service:
+    name: jenkins
+    state: restarted
+    enabled: true
+
+- name: Show initial admin password location
+  debug:
+    msg: "Get the initial admin password with: sudo cat /var/lib/jenkins/secrets/initialAdminPassword"
